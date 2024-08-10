@@ -11,22 +11,3 @@ services:
         python manage.py createsuperuser --noinput --email admin@viridiq.com --username admin --password $SUPERUSER_PASSWORD
     startCommand: python manage.py runserver 0.0.0.0:8000
     plan: free
-    envVars:
-      - key: EMAIL_BACKEND
-        value: $EMAIL_BACKEND
-      - key: EMAIL_HOST
-        value: $EMAIL_HOST
-      - key: EMAIL_PORT
-        value: $EMAIL_PORT
-      - key: EMAIL_USE_TLS
-        value: $EMAIL_USE_TLS
-      - key: EMAIL_HOST_USER
-        value: $EMAIL_HOST_USER
-      - key: EMAIL_HOST_PASSWORD
-        value: $EMAIL_HOST_PASSWORD
-      - key: EMAIL_FROM
-        value: $EMAIL_FROM
-      - key: FRONTEND_URL
-        value: $FRONTEND_URL
-      - key: ENCRYPTION_KEY
-        value: $ENCRYPTION_KEY
