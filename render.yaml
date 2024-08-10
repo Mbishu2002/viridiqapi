@@ -8,7 +8,7 @@ services:
       python manage.py collectstatic --noinput
       python manage.py makemigrations
       python manage.py migrate
-      python DJANGO_SUPERUSER_PASSWORD=mbishu2002 manage.py createsuperuser --noinput --email admin@viridiq.com 
+      python manage.py createsuperuser 
     startCommand: python manage.py runserver 0.0.0.0:8000
     plan: free
     envVars:
