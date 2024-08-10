@@ -8,6 +8,26 @@ services:
       python manage.py collectstatic --noinput
       python manage.py makemigrations
       python manage.py migrate
-        python manage.py createsuperuser --noinput --email admin@viridiq.com --username admin --password $SUPERUSER_PASSWORD
+      python manage.py create_superuser --noinput --email admin@viridiq.com --password mbishu2002
     startCommand: python manage.py runserver 0.0.0.0:8000
     plan: free
+    envVars:
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.smtp.EmailBackend
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "true"
+      - key: EMAIL_HOST_USER
+        value: peacekarla1@gmail.com
+      - key: EMAIL_HOST_PASSWORD
+        value: anzphalynqkdijyj
+      - key: EMAIL_FROM
+        value: peacekarla1@gmail.com
+      - key: FRONTEND_URL
+        value: http://localhost:3000
+      - key: ENCRYPTION_KEY
+        value: 5UBIMCREKh8xjzsFSa4ryA0Mx1k3ZeHFGe53dwTeMrM=
+
