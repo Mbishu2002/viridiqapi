@@ -8,12 +8,10 @@ services:
       python manage.py collectstatic --noinput
       python manage.py makemigrations
       python manage.py migrate
-        python manage.py create_superuser --noinput --email admin@viridiq.com --username admin --password $SUPERUSER_PASSWORD
+        python manage.py createsuperuser --noinput --email admin@viridiq.com --username admin --password $SUPERUSER_PASSWORD
     startCommand: python manage.py runserver 0.0.0.0:8000
     plan: free
     envVars:
-      - key: DJANGO_SECRET_KEY
-        value: $DJANGO_SECRET_KEY
       - key: EMAIL_BACKEND
         value: $EMAIL_BACKEND
       - key: EMAIL_HOST
