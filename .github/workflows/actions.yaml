@@ -45,5 +45,5 @@ jobs:
                        --build-arg FRONTEND_URL=${{ secrets.FRONTEND_URL }} \
                        --build-arg ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }} \
                        --build-arg SUPERUSER_PASSWORD=${{ secrets.SUPERUSER_PASSWORD }} \
-                       -t ${{ secrets.DOCKER_USERNAME }}/my-django-app:latest .
+                       -t ${{ secrets.DOCKER_USERNAME }}/viridiqapi:latest .
           docker push ${{ secrets.DOCKER_USERNAME }}/viridiqapi:latest
