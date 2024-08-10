@@ -1,0 +1,38 @@
+{
+    "register_client": {
+      "email": "example@example.com",
+      "password": "your_password"
+    },
+    "verify_otp": {
+      "otp": "123456"
+    },
+    "login_with_token": {
+      "email": "example@example.com",
+      "password": "your_password"
+    },
+    "register_with_insurance": {
+      "insurance_company": "1"
+    },
+    "subscribe_to_plan": {
+      "plan_id": "2"
+    },
+    "unsubscribe_from_plan": {
+      "plan_id": "2"
+    },
+    "save_health_data": {
+      "data": "{\"blood_pressure\": \"120/80\"}",
+      "timestamp": "2024-08-09T10:00:00Z"
+    },
+    "submit_claim": {
+      "claim_type": "medical",
+      "amount_claimed": 1000.00,
+      "description": "Claim for recent hospital visit"
+    },
+    "add_credit_card": {
+      "token": "card_token_here",
+      "last4": "1234",
+      "exp_month": 12,
+      "exp_year": 2025
+    }
+  }
+  
