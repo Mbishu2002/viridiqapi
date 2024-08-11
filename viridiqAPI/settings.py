@@ -161,6 +161,11 @@ SECURE_BROWSER_XSS_FILTER = False
 SECURE_CONTENT_TYPE_NOSNIFF = False
 SECURE_SSL_REDIRECT = False
 
+# settings.py
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://viridiqapi-latest.onrender.com',
+]
 
 
 # Optional settings:
