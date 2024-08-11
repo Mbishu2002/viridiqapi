@@ -4,13 +4,14 @@ from . import views
 urlpatterns = [
     # Registration and Authentication
     path('register/', views.register_client, name='register_client'),
+    path('login/', views.login_with_token, name='login_with_token'),
     path('register-with-insurance/', views.register_with_insurance, name='register_with_insurance'),
     path('verify/', views.verify_otp, name="otp_verification"),
     path('resend-otp/', views.resend_otp, name='resend_otp'),
 
     # Forgot and Reset Password
     path('forgot-password/', views.forgot_password, name='forgot_password'),
-    path('reset-password/<uidb64>/<token>/', views.reset_password, name='reset_password'),
+    path('reset-password/<uidb64>/<token>/', views.password_reset_confirm, name='reset_password'),
 
     # Client Profile
     path('profile/', views.get_client_profile, name='get_client_profile'),

@@ -48,16 +48,15 @@ class Client(AbstractUser):
     objects = MyUserManager() 
 
     def generate_otp(self):
-        totp = pyotp.TOTP('base32secret3232')  
+        totp = pyotp.TOTP(pyotp.random_base32())  
         self.otp = totp.now()
         self.otp_expires_at = timezone.now() + timezone.timedelta(minutes=10)
         self.save()
         return self.otp
 
     def verify_otp(self, otp):
-        provided_otp = int(otp)
-        totp = pyotp.TOTP(self.otp, interval=300)  
-        return totp.verify(provided_otp)
+        totp = pyotp.TOTP(self.otp)  
+        return totp.verify(otp) and self.otp_expires_at > timezone.now()
 
 # HealthData model with encryption
 class HealthData(models.Model):

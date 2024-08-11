@@ -8,12 +8,13 @@ from .views import (
     view_client_profile,
     update_claim_status,
     request_client_data,
-    manage_subscriptions
+    manage_subscriptions,
+    email_confirmation
 )
 
 urlpatterns = [
     path('register/', register_insurance_company, name='register_insurance_company'),
-    path('verify-email/<str:uidb64>/<str:token>/', verify_email, name='verify_email'),
+    path('verify-email/<str:uidb64>/<str:token>/',email_confirmation, name='verify_email'),
     path('login/', login, name='login'),
     path('clients/', list_clients, name='list_clients'),
     path('plans/create/', create_insurance_plan, name='create_insurance_plan'),

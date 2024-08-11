@@ -1,4 +1,4 @@
-<!-- templates/password_reset_email.html -->
+<!-- templates/email_confirmation.html -->
 
 <!DOCTYPE html>
 <html>
@@ -9,6 +9,7 @@
             margin: 0;
             padding: 20px;
             background-color: #f9f9f9;
+            text-align: center;
         }
         .container {
             max-width: 600px;
@@ -25,28 +26,25 @@
             font-size: 16px;
             line-height: 1.5;
         }
-        a {
+        .message {
+            font-size: 18px;
             color: #007BFF;
-            text-decoration: none;
         }
-        a:hover {
-            text-decoration: underline;
-        }
-        .footer {
-            font-size: 14px;
-            color: #888888;
-            margin-top: 20px;
+        .error {
+            font-size: 18px;
+            color: #FF0000;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Password Reset Request</h1>
-        <p>Hello {{ user.email }},</p>
-        <p>We received a request to reset your password. Click the link below to reset it:</p>
-        <p><a href="{{ reset_link }}">Reset Password</a></p>
-        <p>If you didn't request this change, please ignore this email.</p>
-        <p class="footer">Best regards,<br>Your Company Team</p>
+        {% if success %}
+            <h1>Email Confirmed!</h1>
+            <p class="message">Your email address has been successfully confirmed. You can now log in to your account.</p>
+        {% else %}
+            <h1>Confirmation Failed</h1>
+            <p class="error">There was an issue confirming your email. The link may be invalid or expired. Please try again.</p>
+        {% endif %}
     </div>
 </body>
 </html>

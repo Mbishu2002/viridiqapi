@@ -1,6 +1,7 @@
 from rest_framework.decorators import api_view, authentication_classes
 from rest_framework.response import Response
 from django.contrib.auth.hashers import check_password
+from django.shortcuts import render, redirect
 from rest_framework import status
 from django.utils.encoding import force_bytes, force_str
 from django.core.files.storage import default_storage
@@ -15,6 +16,8 @@ from django.core.mail import EmailMessage
 from django.template.loader import render_to_string
 from django.utils import timezone
 import pyotp
+from django.http import JsonResponse
+from django.contrib.auth.forms import SetPasswordForm
 from .models import HealthData, DataRequest, CreditCard, Client
 from .serializers import ClientSerializer, HealthDataSerializer, DataRequestSerializer, CreditCardSerializer, LoginSerializer
 from Insurance.models import Claim, InsurancePlan, Subscription
@@ -349,3 +352,24 @@ def delete_credit_card(request, card_id):
         return Response({'message': 'Credit card deleted'}, status=status.HTTP_204_NO_CONTENT)
     except CreditCard.DoesNotExist:
         return Response({'error': 'Credit card not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+def password_reset_confirm(request, uidb64, token):
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = get_user_model().objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, user.DoesNotExist):
+        user = None
+
+    if user is not None and default_token_generator.check_token(user, token):
+        if request.method == 'POST':
+            form = SetPasswordForm(user, request.POST)
+            if form.is_valid():
+                form.save()
+                return JsonResponse({'message': 'Password has been reset'}, status=200)
+        else:
+            form = SetPasswordForm(user)
+        
+        return render(request, 'password_change.html', {'form': form})
+    
+    return JsonResponse({'error': 'Invalid or expired token'}, status=400)
+

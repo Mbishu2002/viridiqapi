@@ -1,8 +1,8 @@
 from django.core.mail import send_mail
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from django.utils.encoding import force_bytes
+from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.hashers import check_password
-
+from django.shortcuts import render, redirect
 from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings
 from django.core.mail import EmailMessage
@@ -28,7 +28,7 @@ def register_insurance_company(request):
         user = serializer.save()
         token = default_token_generator.make_token(user)
         uid = urlsafe_base64_encode(force_bytes(user.pk))
-        verification_link = f"{settings.FRONTEND_URL}/verify-email/{uid}/{token}/"
+        verification_link =request.build_absolute_uri(f'/verify-email/{uid}/{token}/')
         
         subject = 'Activate your Insurance Company Account'
         message = render_to_string('verification_email.html', {
@@ -133,3 +133,19 @@ def manage_subscriptions(request):
     subscriptions = Subscription.objects.filter(plan__company=company)
     serializer = SubscriptionDetailSerializer(subscriptions, many=True)
     return Response(serializer.data)
+
+def email_confirmation(request, uidb64, token):
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = get_user_model().objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, user.DoesNotExist):
+        user = None
+
+    if user is not None and default_token_generator.check_token(user, token):
+        user.is_active = True
+        user.save()
+        success = True
+    else:
+        success = False
+
+    return render(request, 'email_confirmation.html', {'success': success})
