@@ -40,7 +40,7 @@ class Client(AbstractUser):
     username = None
     profile_image = models.ImageField(upload_to='profile_images/', blank=True, null=True)
     insurance_companies = models.ManyToManyField('Insurance.InsuranceCompany', related_name='clients', null=True)
-    otp = models.CharField(max_length=6, blank=True, null=True)
+    otp = models.CharField(max_length=255, blank=True, null=True)
     otp_expires_at = models.DateTimeField(blank=True, null=True)
 
     USERNAME_FIELD = 'email'
@@ -48,15 +48,23 @@ class Client(AbstractUser):
     objects = MyUserManager() 
 
     def generate_otp(self):
-        totp = pyotp.TOTP(pyotp.random_base32())  
-        self.otp = totp.now()
+        # Generate a new Base32 secret
+        self.otp = pyotp.random_base32()
+        totp = pyotp.TOTP(self.otp)
+        
+        # Generate the OTP code
+        otp_code = totp.now()
+        
+        # Set expiration time for the OTP
         self.otp_expires_at = timezone.now() + timezone.timedelta(minutes=10)
         self.save()
-        return self.otp
+        
+        return otp_code
 
-    def verify_otp(self, otp):
-        totp = pyotp.TOTP(self.otp)  
-        return totp.verify(otp) and self.otp_expires_at > timezone.now()
+def verify_otp(self, otp):
+    totp = pyotp.TOTP(self.otp)
+    return totp.verify(otp) and self.otp_expires_at > timezone.now()
+
 
 # HealthData model with encryption
 class HealthData(models.Model):
