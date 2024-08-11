@@ -56,7 +56,7 @@ class Client(AbstractUser):
 
     def verify_otp(self, otp):
         provided_otp = int(otp)
-        totp = pyotp.TOTP('base32secret3232', interval=300)  
+        totp = pyotp.TOTP(self.otp, interval=300)  
         return totp.verify(provided_otp)
 
 # HealthData model with encryption

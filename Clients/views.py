@@ -9,13 +9,14 @@ from django.contrib.auth.tokens import default_token_generator
 from rest_framework.authtoken.models import Token
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.contrib.auth import get_user_model, authenticate
+from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.hashers import make_password
 from django.core.mail import EmailMessage
 from django.template.loader import render_to_string
 from django.utils import timezone
 import pyotp
 from .models import HealthData, DataRequest, CreditCard, Client
-from .serializers import ClientSerializer, HealthDataSerializer, DataRequestSerializer, CreditCardSerializer
+from .serializers import ClientSerializer, HealthDataSerializer, DataRequestSerializer, CreditCardSerializer, LoginSerializer
 from Insurance.models import Claim, InsurancePlan, Subscription
 from Insurance.serializers import ClaimSerializer, InsurancePlanSerializer, SubscriptionSerializer
 from django.conf import settings
@@ -81,22 +82,30 @@ def resend_otp(request):
 
 @api_view(['POST'])
 def login_with_token(request):
-    email = request.data.get('email')
-    password = request.data.get('password')
-
-    if not email or not password:
-        return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        user = Client.objects.get(email=email)
-    except Client.DoesNotExist:
-        return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
-
-    if user.check_password(password):
-        token, created = Token.objects.get_or_create(user=user)
-        return Response({'token': token.key, 'user': ClientSerializer(user).data}, status=status.HTTP_200_OK)
+    serializer = LoginSerializer(data=request.data)
+    if serializer.is_valid():
+        email = serializer.validated_data['email']
+        password = serializer.validated_data['password']
+        
+        try:
+            user = Client.objects.get(email=email)
+        except ObjectDoesNotExist:
+            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        if user.check_password(password):
+            token, created = Token.objects.get_or_create(user=user)
+            
+            user_data = {
+                'email': user.email,
+                'first_name': user.first_name,
+                'profile_image': user.profile_image.url if user.profile_image else None,
+            }
+            
+            return Response({'token': token.key, 'user': user_data}, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
     else:
-        return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 # Forgot Password
 @api_view(['POST'])
 def forgot_password(request):
