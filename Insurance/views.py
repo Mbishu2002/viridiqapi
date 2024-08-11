@@ -58,13 +58,20 @@ def verify_email(request, uidb64, token):
 def login(request):
     email = request.data.get('email')
     password = request.data.get('password')
-    user = authenticate(request, username=email, password=password)
-    
-    if user is not None and user.is_active:
+
+    if not email or not password:
+        return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = InsuranceCompany.objects.get(email=email)
+    except InsuranceCompany.DoesNotExist:
+        return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if user.check_password(password):
         token, created = Token.objects.get_or_create(user=user)
-        user_data = InsuranceCompanySerializer(user).data
-        return Response({'token': token.key, 'user': user_data}, status=status.HTTP_200_OK)
-    return Response({'error': 'Invalid credentials or inactive account'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'token': token.key, 'user': InsuranceCompanySerializer(user).data}, status=status.HTTP_200_OK)
+    else:
+        return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])

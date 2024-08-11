@@ -80,14 +80,22 @@ def resend_otp(request):
 
 @api_view(['POST'])
 def login_with_token(request):
-    username = request.data.get('email')
+    email = request.data.get('email')
     password = request.data.get('password')
-    user = authenticate(username=username, password=password)
-    if user:
+
+    if not email or not password:
+        return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = Client.objects.get(email=email)
+    except Client.DoesNotExist:
+        return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if user.check_password(password):
         token, created = Token.objects.get_or_create(user=user)
-        user_data = ClientSerializer(user).data
-        return Response({'token': token.key, 'user': user_data}, status=status.HTTP_200_OK)
-    return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'token': token.key, 'user': ClientSerializer(user).data}, status=status.HTTP_200_OK)
+    else:
+        return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
 # Forgot Password
 @api_view(['POST'])
 def forgot_password(request):
