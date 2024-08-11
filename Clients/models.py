@@ -55,8 +55,9 @@ class Client(AbstractUser):
         return self.otp
 
     def verify_otp(self, otp):
-        totp = pyotp.TOTP('base32secret3232')  # Replace with your own key
-        return totp.verify(otp) and self.otp_expires_at > timezone.now()
+        provided_otp = int(otp)
+        totp = pyotp.TOTP('base32secret3232')  
+        return totp.verify(provided_otp) and self.otp_expires_at > timezone.now()
 
 # HealthData model with encryption
 class HealthData(models.Model):
