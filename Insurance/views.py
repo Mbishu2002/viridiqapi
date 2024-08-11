@@ -28,7 +28,7 @@ def register_insurance_company(request):
         user = serializer.save()
         token = default_token_generator.make_token(user)
         uid = urlsafe_base64_encode(force_bytes(user.pk))
-        verification_link =request.build_absolute_uri(f'/verify-email/{uid}/{token}/')
+        verification_link =request.build_absolute_uri(f'api/insurance/verify-email/{uid}/{token}/')
         
         subject = 'Activate your Insurance Company Account'
         message = render_to_string('verification_email.html', {
