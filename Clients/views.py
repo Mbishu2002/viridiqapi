@@ -1,5 +1,6 @@
 from rest_framework.decorators import api_view, authentication_classes
 from rest_framework.response import Response
+from django.contrib.auth.hashers import check_password
 from rest_framework import status
 from django.utils.encoding import force_bytes, force_str
 from django.core.files.storage import default_storage
@@ -46,7 +47,7 @@ def register_client(request):
 @api_view(['POST'])
 def verify_otp(request):
     otp = request.data.get('otp')
-    user = get_user_model().objects.filter(otp=otp).first()
+    user = Client.objects.filter(otp=otp).first()
     if user and user.verify_otp(otp):
         user.otp = None
         user.otp_expires_at = None
