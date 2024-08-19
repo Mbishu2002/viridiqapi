@@ -24,7 +24,6 @@ class MyUserManager(BaseUserManager):
 def get_cipher_suite():
     return Fernet(settings.ENCRYPTION_KEY.encode())
 
-# Client model
 class Client(AbstractUser):
     groups = models.ManyToManyField(
         Group,
@@ -61,9 +60,9 @@ class Client(AbstractUser):
         
         return otp_code
 
-def verify_otp(self, otp):
-    totp = pyotp.TOTP(self.otp)
-    return totp.verify(otp) and self.otp_expires_at > timezone.now()
+    def verify_otp(self, otp):
+        totp = pyotp.TOTP(pyotp.random_base32(), interval=300)
+        return totp.verify(otp)
 
 
 # HealthData model with encryption

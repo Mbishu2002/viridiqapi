@@ -51,8 +51,14 @@ def register_client(request):
 @api_view(['POST'])
 def verify_otp(request):
     otp = request.data.get('otp')
-    user = Client.objects.filter(otp=otp).first()
+    email = request.data.get('email')
+    user = get_user_model().objects.filter(email=email).first()
+
+    if user:
+        print(f"OTP verification attempt: Email: {email}, OTP: {otp}")
+
     if user and user.verify_otp(otp):
+        print(user.verify_otp(otp))
         user.otp = None
         user.otp_expires_at = None
         user.save()
@@ -118,7 +124,7 @@ def forgot_password(request):
     if user:
         token = default_token_generator.make_token(user)
         uid = urlsafe_base64_encode(force_bytes(user.pk))
-        reset_link = request.build_absolute_uri(f'api/clients/reset-password/{uid}/{token}/')
+        reset_link = f'https://viridiqapi-latest.onrender.com/api/clients/reset-password/{uid}/{token}/'
 
         subject = 'Password Reset Request'
         message = render_to_string('password_reset_email.html', {

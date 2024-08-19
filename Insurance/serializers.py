@@ -28,14 +28,14 @@ class ClaimSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Claim
-        fields = ['id', 'plan', 'amount_claimed', 'status', 'date_submitted', 'description']
+        fields = ['id', 'client','plan', 'amount_claimed', 'status', 'date_submitted', 'description']
         read_only_fields = ['status', 'date_submitted']
 class InsuranceCompanyDetailSerializer(serializers.ModelSerializer):
     plans = InsurancePlanSerializer(many=True, read_only=True)
 
     class Meta:
         model = InsuranceCompany
-        fields = ['id', 'company_name', 'logo', 'phone_number', 'location', 'email', 'address', 'website', 'plans']
+        fields = ['id', 'company_name', 'logo', 'phone_number', 'location', 'email', 'address', 'website']
 
 class SubscriptionDetailSerializer(serializers.ModelSerializer):
     client = ClientSerializer(read_only=True)
@@ -44,3 +44,6 @@ class SubscriptionDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Subscription
         fields = ['id', 'client', 'plan', 'start_date', 'end_date', 'status']
+
+class VerifyOTPSerializer(serializers.Serializer):
+    otp = serializers.CharField(max_length=255)

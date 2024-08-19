@@ -15,7 +15,7 @@ urlpatterns = [
 
     # Client Profile
     path('profile/', views.get_client_profile, name='get_client_profile'),
-    path('profile/update/', views.update_profile, name='update_profile'),
+    path('profile/update', views.update_profile, name='update_profile'),
 
     # Health Data
     path('health-data/', views.get_health_data, name='get_health_data'),
@@ -34,6 +34,7 @@ urlpatterns = [
 
     # Subscriptions
     path('subscribe/', views.subscribe_to_plan, name='subscribe_to_plan'),
+    path('unsubscribe/', views.unsubscribe_from_plan, name='unsubcribe'),
     path('subscribed-plans/', views.get_subscribed_plans, name='client_subscribed_plans'),
 
     # Credit Card Details
