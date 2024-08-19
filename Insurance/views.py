@@ -137,7 +137,7 @@ def manage_subscriptions(request):
 def email_confirmation(request, uidb64, token):
     try:
         uid = force_str(urlsafe_base64_decode(uidb64))
-        user = get_user_model().objects.get(pk=uid)
+        user = InsuranceCompany.objects.get(pk=uid)
     except (TypeError, ValueError, OverflowError, user.DoesNotExist):
         user = None
 
