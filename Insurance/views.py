@@ -18,7 +18,7 @@ from .models import InsuranceCompany, InsurancePlan, Subscription
 from django.contrib.auth import get_user_model
 from .serializers import InsuranceCompanySerializer, InsurancePlanSerializer, SubscriptionSerializer, InsuranceCompanyDetailSerializer, SubscriptionDetailSerializer
 from Clients.models import Client, DataRequest
-from Clients.serializers import ClientSerializer
+from Clients.serializers import ClientSerializer, LoginSerializer
 
 
 @api_view(['POST'])
@@ -58,11 +58,10 @@ def verify_email(request, uidb64, token):
 
 @api_view(['POST'])
 def login(request):
-    email = request.data.get('email')
-    password = request.data.get('password')
-
-    if not email or not password:
-        return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+    serializer = LoginSerializer(data=request.data)
+    if serializer.is_valid():
+        email = serializer.validated_data['email']
+        password = serializer.validated_data['password']
 
     try:
         user = InsuranceCompany.objects.get(email=email)
