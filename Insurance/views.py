@@ -2,6 +2,7 @@ from django.core.mail import send_mail
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.hashers import check_password
+from django.core.exceptions import ObjectDoesNotExist
 from django.shortcuts import render, redirect
 from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings
@@ -65,7 +66,7 @@ def login(request):
 
     try:
         user = InsuranceCompany.objects.get(email=email)
-    except InsuranceCompany.DoesNotExist:
+    except ObjectDoesNotExist:
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
 
     if user.check_password(password):
