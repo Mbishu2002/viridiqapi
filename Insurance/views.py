@@ -12,15 +12,14 @@ from django.contrib.auth import authenticate
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import api_view,  authentication_classes
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.models import Token
 from django.shortcuts import get_object_or_404
 from .models import InsuranceCompany, InsurancePlan, Subscription
-from django.contrib.auth import get_user_model
-from .serializers import InsuranceCompanySerializer, InsurancePlanSerializer, SubscriptionSerializer, InsuranceCompanyDetailSerializer, SubscriptionDetailSerializer
-from Clients.models import Client, DataRequest
-from Clients.serializers import ClientSerializer, LoginSerializer
-
+from .serializers import InsuranceCompanySerializer, LoginSerializer,  InsurancePlanSerializer, SubscriptionSerializer, InsuranceCompanyDetailSerializer, SubscriptionDetailSerializer
+from Clients.models import Client, DataRequest,CustomToken
+from Clients.serializers import ClientSerializer
+from .utils import get_or_create_token
+from Clients.customtokenauth import CustomTokenAuthentication
 
 @api_view(['POST'])
 def register_insurance_company(request):
@@ -70,13 +69,13 @@ def login(request):
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
 
     if user.check_password(password):
-        token, created = Token.objects.get_or_create(user=user)
+        token, created = CustomToken.objects.get_or_create(insurance_company=user)
         return Response({'token': token.key, 'user': InsuranceCompanySerializer(user).data}, status=status.HTTP_200_OK)
     else:
-        return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response( serializer.data, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def list_clients(request):
     company = get_object_or_404(InsuranceCompany, email=request.user.email)
     clients = Client.objects.filter(insurance_company=company)
@@ -84,7 +83,7 @@ def list_clients(request):
     return Response(serializer.data)
 
 @api_view(['POST'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def create_insurance_plan(request):
     company = get_object_or_404(InsuranceCompany, email=request.user.email)
     data = request.data.copy()
@@ -96,7 +95,7 @@ def create_insurance_plan(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def view_client_profile(request, client_id):
     company = get_object_or_404(InsuranceCompany, email=request.user.email)
     client = get_object_or_404(Client, id=client_id, insurance_company=company)
@@ -104,7 +103,7 @@ def view_client_profile(request, client_id):
     return Response(serializer.data)
 
 @api_view(['POST'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def update_claim_status(request, subscription_id):
     company = get_object_or_404(InsuranceCompany, email=request.user.email)
     subscription = get_object_or_404(Subscription, id=subscription_id, plan__company=company)
@@ -118,7 +117,7 @@ def update_claim_status(request, subscription_id):
     return Response({'status': f'Claim {status}'}, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def request_client_data(request, client_id):
     company = get_object_or_404(InsuranceCompany, email=request.user.email)
     client = get_object_or_404(Client, id=client_id, insurance_company=company)
@@ -127,7 +126,7 @@ def request_client_data(request, client_id):
     return Response({'status': 'Data request created'}, status=status.HTTP_201_CREATED)
 
 @api_view(['GET'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def manage_subscriptions(request):
     company = get_object_or_404(InsuranceCompany, email=request.user.email)
     subscriptions = Subscription.objects.filter(plan__company=company)

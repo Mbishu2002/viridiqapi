@@ -5,7 +5,6 @@ from django.shortcuts import render, redirect
 from rest_framework import status
 from django.utils.encoding import force_bytes, force_str
 from django.core.files.storage import default_storage
-from rest_framework.authentication import TokenAuthentication
 from django.contrib.auth.tokens import default_token_generator
 from rest_framework.authtoken.models import Token
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -18,12 +17,13 @@ from django.utils import timezone
 import pyotp
 from django.http import JsonResponse
 from django.contrib.auth.forms import SetPasswordForm
-from .models import HealthData, DataRequest, CreditCard, Client
+from .models import HealthData, DataRequest, CreditCard, Client, CustomToken
 from .serializers import ClientSerializer, HealthDataSerializer, DataRequestSerializer, CreditCardSerializer, LoginSerializer
 from Insurance.models import Claim, InsurancePlan, Subscription
 from Insurance.serializers import ClaimSerializer, InsurancePlanSerializer, SubscriptionSerializer
 from django.conf import settings
 import datetime
+from .customtokenauth import CustomTokenAuthentication
 
 # Registration views
 @api_view(['POST'])
@@ -52,20 +52,17 @@ def register_client(request):
 def verify_otp(request):
     otp = request.data.get('otp')
     email = request.data.get('email')
-    user = get_user_model().objects.filter(email=email).first()
-
-    if user:
-        print(f"OTP verification attempt: Email: {email}, OTP: {otp}")
+    user = Client.objects.filter(email=email).first()
 
     if user and user.verify_otp(otp):
         print(user.verify_otp(otp))
         user.otp = None
         user.otp_expires_at = None
         user.save()
-        token, created = Token.objects.get_or_create(user=user)
+        token, created = CustomToken.objects.get_or_create(client=user)
         user_data = ClientSerializer(user).data
         return Response({'token': token.key, 'user': user_data}, status=status.HTTP_200_OK)
-    return Response({'error': 'Invalid or expired OTP'}, status=status.HTTP_400_BAD_REQUEST)
+    return Response({'error': 'Invalid or expired OTP', "otp": user.verify_otp(otp)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 def resend_otp(request):
@@ -102,7 +99,7 @@ def login_with_token(request):
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
         
         if user.check_password(password):
-            token, created = Token.objects.get_or_create(user=user)
+            token, created = CustomToken.objects.get_or_create(client=user)
             
             user_data = {
                 'email': user.email,
@@ -157,7 +154,7 @@ def reset_password(request, uidb64, token):
 
 # Update Profile
 @api_view(['PATCH'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def update_profile(request):
     serializer = ClientSerializer(request.user, data=request.data, partial=True)
     
@@ -179,7 +176,7 @@ def update_profile(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def register_with_insurance(request):
     client = request.user
     company_id = request.data.get('insurance_company')
@@ -190,7 +187,7 @@ def register_with_insurance(request):
     return Response({'error': 'Insurance company ID required'}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def subscribe_to_plan(request):
     plan_id = request.data.get('plan_id')
     if plan_id:
@@ -206,7 +203,7 @@ def subscribe_to_plan(request):
     return Response({'error': 'Plan ID required'}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def unsubscribe_from_plan(request):
     plan_id = request.data.get('plan_id')
     if plan_id:
@@ -224,13 +221,13 @@ def unsubscribe_from_plan(request):
 
 # Client Profile
 @api_view(['GET'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def get_client_profile(request):
     serializer = ClientSerializer(request.user)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 @api_view(['PATCH'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def update_client_profile(request):
     serializer = ClientSerializer(request.user, data=request.data, partial=True)
     if serializer.is_valid():
@@ -240,14 +237,14 @@ def update_client_profile(request):
 
 # Health Data
 @api_view(['GET'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def get_health_data(request):
     data = HealthData.objects.filter(client=request.user)
     serializer = HealthDataSerializer(data, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def save_health_data(request):
     serializer = HealthDataSerializer(data=request.data)
     if serializer.is_valid():
@@ -257,14 +254,14 @@ def save_health_data(request):
 
 # Data Requests
 @api_view(['GET'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def get_data_requests(request):
     requests = DataRequest.objects.filter(client=request.user)
     serializer = DataRequestSerializer(requests, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 @api_view(['PATCH'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def update_data_request_status(request, request_id):
     try:
         data_request = DataRequest.objects.get(id=request_id, client=request.user)
@@ -282,14 +279,14 @@ def update_data_request_status(request, request_id):
 
 # Claims
 @api_view(['GET'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def get_claims(request):
     claims = Claim.objects.filter(client=request.user)
     serializer = ClaimSerializer(claims, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def submit_claim(request):
     data = request.data.copy()
     data['client'] = request.user.id  # Automatically set the client to the authenticated user
@@ -303,7 +300,7 @@ def submit_claim(request):
 
 # Insurance Plans
 @api_view(['GET'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def get_insurance_plans(request):
     if request.user.insurance_company:
         plans = InsurancePlan.objects.filter(insurancecompany=request.user.insurance_company)
@@ -312,7 +309,7 @@ def get_insurance_plans(request):
     return Response({'error': 'Client is not registered with any insurance company'}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def get_subscribed_plans(request):
     user = request.user
     subscriptions = Subscription.objects.filter(client=user)
@@ -320,7 +317,7 @@ def get_subscribed_plans(request):
     return Response(serializer.data)
 # Credit Card
 @api_view(['POST'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def add_credit_card(request):
     serializer = CreditCardSerializer(data=request.data)
     if serializer.is_valid():
@@ -329,14 +326,14 @@ def add_credit_card(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def get_credit_cards(request):
     cards = CreditCard.objects.filter(client=request.user)
     serializer = CreditCardSerializer(cards, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 @api_view(['PATCH'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def update_credit_card(request, card_id):
     try:
         card = CreditCard.objects.get(id=card_id, client=request.user)
@@ -350,7 +347,7 @@ def update_credit_card(request, card_id):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([CustomTokenAuthentication])
 def delete_credit_card(request, card_id):
     try:
         card = CreditCard.objects.get(id=card_id, client=request.user)

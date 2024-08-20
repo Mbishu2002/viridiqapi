@@ -4,7 +4,8 @@ from cryptography.fernet import Fernet
 from django.conf import settings
 from django.utils import timezone
 import pyotp
-
+import binascii
+import os
 class MyUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
@@ -49,19 +50,19 @@ class Client(AbstractUser):
     def generate_otp(self):
         # Generate a new Base32 secret
         self.otp = pyotp.random_base32()
-        totp = pyotp.TOTP(self.otp)
+        totp = pyotp.TOTP(self.otp, interval=300)
         
         # Generate the OTP code
         otp_code = totp.now()
         
         # Set expiration time for the OTP
-        self.otp_expires_at = timezone.now() + timezone.timedelta(minutes=10)
+        self.otp_expires_at = timezone.now() + timezone.timedelta(minutes=5)
         self.save()
         
         return otp_code
 
     def verify_otp(self, otp):
-        totp = pyotp.TOTP(pyotp.random_base32(), interval=300)
+        totp = pyotp.TOTP(self.otp, interval=300)
         return totp.verify(otp)
 
 
@@ -105,3 +106,21 @@ class CreditCard(models.Model):
     def get_token(self):
         cipher_suite = get_cipher_suite()
         return cipher_suite.decrypt(self.token.encode('utf-8')).decode('utf-8')
+
+
+class CustomToken(models.Model):
+    key = models.CharField(max_length=40, unique=True)
+    client = models.ForeignKey('Client', null=True, blank=True, on_delete=models.CASCADE)
+    insurance_company = models.ForeignKey('Insurance.InsuranceCompany', null=True, blank=True, on_delete=models.CASCADE)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = self.generate_key()
+        return super().save(*args, **kwargs)
+
+    def generate_key(self):
+        return binascii.hexlify(os.urandom(20)).decode()
+
+    def __str__(self):
+        return self.key

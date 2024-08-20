@@ -5,7 +5,26 @@ from Clients.serializers import ClientSerializer
 class InsuranceCompanySerializer(serializers.ModelSerializer):
     class Meta:
         model = InsuranceCompany
-        fields = ['id', 'company_name', 'logo', 'phone_number', 'location', 'email', 'address', 'website']
+        fields = ['id', 'company_name', 'logo', 'phone_number', 'location', 'email', 'address', 'website', 'password']
+        extra_kwargs = {
+            'password': {'write_only': True},
+        }
+
+    def create(self, validated_data):
+        password = validated_data.pop('password', None)
+        instance = super().create(validated_data)
+        if password:
+            instance.set_password(password)
+            instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop('password', None)
+        instance = super().update(instance, validated_data)
+        if password:
+            instance.set_password(password)
+            instance.save()
+        return instance
 
 class InsurancePlanSerializer(serializers.ModelSerializer):
     company = serializers.StringRelatedField()  
@@ -45,5 +64,9 @@ class SubscriptionDetailSerializer(serializers.ModelSerializer):
         model = Subscription
         fields = ['id', 'client', 'plan', 'start_date', 'end_date', 'status']
 
-class VerifyOTPSerializer(serializers.Serializer):
-    otp = serializers.CharField(max_length=255)
+
+
+ 
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
