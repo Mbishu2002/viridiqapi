@@ -14,13 +14,14 @@ from django.contrib.auth.hashers import make_password
 from django.core.mail import EmailMessage
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django.core.files.storage import default_storage
 import pyotp
 from django.http import JsonResponse
 from django.contrib.auth.forms import SetPasswordForm
 from .models import HealthData, DataRequest, CreditCard, Client, CustomToken
 from .serializers import ClientSerializer, HealthDataSerializer, DataRequestSerializer, CreditCardSerializer, LoginSerializer
-from Insurance.models import Claim, InsurancePlan, Subscription
-from Insurance.serializers import ClaimSerializer, InsurancePlanSerializer, SubscriptionSerializer
+from Insurance.models import Claim, InsurancePlan, Subscription, InsuranceCompany, ClaimDocument
+from Insurance.serializers import ClaimSerializer, InsurancePlanSerializer, SubscriptionSerializer, InsuranceCompanySerializer
 from django.conf import settings
 import datetime
 from .customtokenauth import CustomTokenAuthentication
@@ -29,6 +30,8 @@ from .customtokenauth import CustomTokenAuthentication
 @api_view(['POST'])
 def register_client(request):
     serializer = ClientSerializer(data=request.data)
+    print(request.data)
+
     if serializer.is_valid():
         password = request.data.get('password')
         if password:
@@ -46,6 +49,8 @@ def register_client(request):
             email.content_subtype = 'html'  
             email.send()
             return Response({'message': 'OTP sent to email'}, status=status.HTTP_201_CREATED)
+
+
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
@@ -53,6 +58,7 @@ def verify_otp(request):
     otp = request.data.get('otp')
     email = request.data.get('email')
     user = Client.objects.filter(email=email).first()
+    print(request.data)
 
     if user and user.verify_otp(otp):
         print(user.verify_otp(otp))
@@ -60,9 +66,9 @@ def verify_otp(request):
         user.otp_expires_at = None
         user.save()
         token, created = CustomToken.objects.get_or_create(client=user)
-        user_data = ClientSerializer(user).data
+        user_data = ClientSerializer(user, context={'request': request}).data
         return Response({'token': token.key, 'user': user_data}, status=status.HTTP_200_OK)
-    return Response({'error': 'Invalid or expired OTP', "otp": user.verify_otp(otp)}, status=status.HTTP_400_BAD_REQUEST)
+    return Response({'error': 'Invalid or expired OTP'}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 def resend_otp(request):
@@ -100,12 +106,13 @@ def login_with_token(request):
         
         if user.check_password(password):
             token, created = CustomToken.objects.get_or_create(client=user)
+            user_data = ClientSerializer(user, context={'request': request}).data
             
-            user_data = {
-                'email': user.email,
-                'first_name': user.first_name,
-                'profile_image': user.profile_image.url if user.profile_image else None,
-            }
+            # user_data = {
+            #     'email': user.email,
+            #     'first_name': user.first_name,
+            #     'profile_image': user.profile_image.url if user.profile_image else None,
+            # }
             
             return Response({'token': token.key, 'user': user_data}, status=status.HTTP_200_OK)
         else:
@@ -153,28 +160,36 @@ def reset_password(request, uidb64, token):
     return Response({'error': 'Invalid or expired token'}, status=status.HTTP_400_BAD_REQUEST)
 
 # Update Profile
-@api_view(['PATCH'])
+@api_view(['PATCH', 'PUT'])
 @authentication_classes([CustomTokenAuthentication])
 def update_profile(request):
-    serializer = ClientSerializer(request.user, data=request.data, partial=True)
-    
-    # If profile image is in request, handle it
+    user_id = request.user.id
+    print(user_id)
+    try:
+        user = Client.objects.get(id=user_id)
+    except Client.DoesNotExist:
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    # Create an instance of the serializer with the user instance and request data
+    serializer = ClientSerializer(user, data=request.data, partial=True, context={'request': request})
+
+    # Handle profile image if present in the request
     profile_image = request.FILES.get('profile_image')
     if profile_image:
-        if hasattr(request.user, 'profile_image'):
-            old_image = request.user.profile_image
-            if old_image and default_storage.exists(old_image.path):
-                default_storage.delete(old_image.path)
+        # Handle old profile image if it exists
+        if user.profile_image and default_storage.exists(user.profile_image.path):
+            default_storage.delete(user.profile_image.path)
+        
+        # Update the request data with the new profile image
+        request.data._mutable = True
+        request.data['profile_image'] = profile_image
+        request.data._mutable = False
 
-        request.user.profile_image = profile_image
-        request.user.save()
-    
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 @api_view(['POST'])
 @authentication_classes([CustomTokenAuthentication])
 def register_with_insurance(request):
@@ -206,18 +221,24 @@ def subscribe_to_plan(request):
 @authentication_classes([CustomTokenAuthentication])
 def unsubscribe_from_plan(request):
     plan_id = request.data.get('plan_id')
-    if plan_id:
-        try:
-            plan = InsurancePlan.objects.get(id=plan_id)
-            subscription = Subscription.objects.filter(client=request.user, plan=plan).first()
-            if subscription:
-                subscription.delete()
-                return Response({'message': 'Unsubscribed from insurance plan'}, status=status.HTTP_200_OK)
-            else:
-                return Response({'error': 'Not subscribed to this plan'}, status=status.HTTP_400_BAD_REQUEST)
-        except InsurancePlan.DoesNotExist:
-            return Response({'error': 'Plan not found'}, status=status.HTTP_404_NOT_FOUND)
-    return Response({'error': 'Plan ID required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not plan_id:
+        return Response({'error': 'Plan ID required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        plan = InsurancePlan.objects.get(id=plan_id)
+        subscription = Subscription.objects.filter(client=request.user, plan=plan).first()
+        
+        if subscription:
+            # Set end_date to now to mark the subscription as ended
+            subscription.end_date = timezone.now()
+            subscription.save()
+            return Response({'message': 'Unsubscribed from insurance plan'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'Not subscribed to this plan'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    except InsurancePlan.DoesNotExist:
+        return Response({'error': 'Plan not found'}, status=status.HTTP_404_NOT_FOUND)
 
 # Client Profile
 @api_view(['GET'])
@@ -226,18 +247,10 @@ def get_client_profile(request):
     serializer = ClientSerializer(request.user)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
-@api_view(['PATCH'])
-@authentication_classes([CustomTokenAuthentication])
-def update_client_profile(request):
-    serializer = ClientSerializer(request.user, data=request.data, partial=True)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 # Health Data
 @api_view(['GET'])
-@authentication_classes([CustomTokenAuthentication])
 def get_health_data(request):
     data = HealthData.objects.filter(client=request.user)
     serializer = HealthDataSerializer(data, many=True)
@@ -246,25 +259,47 @@ def get_health_data(request):
 @api_view(['POST'])
 @authentication_classes([CustomTokenAuthentication])
 def save_health_data(request):
-    serializer = HealthDataSerializer(data=request.data)
+    data = request.data
+    data['client'] = request.user.id  
+
+    serializer = HealthDataSerializer(data=data)
     if serializer.is_valid():
-        serializer.save(client=request.user)
+        serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# Data Requests
 @api_view(['GET'])
 @authentication_classes([CustomTokenAuthentication])
 def get_data_requests(request):
-    requests = DataRequest.objects.filter(client=request.user)
-    serializer = DataRequestSerializer(requests, many=True)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    # Fetch data requests for the authenticated user
+    requests = DataRequest.objects.filter(client=request.user.id)
+    print(request.user.id)
 
+    # Prepare the response data
+    data = []
+    for req in requests:
+        # Fetch the related insurance company
+        company_name = 'Unknown'
+        if req.insurance_company:
+            try:
+                company = InsuranceCompany.objects.get(id=req.insurance_company.id)
+                company_name = company.company_name
+            except InsuranceCompany.DoesNotExist:
+                company_name = 'Unknown'
+
+        data.append({
+            'id': req.id,
+            'insurance_company': company_name,
+            'timestamp': req.timestamp.isoformat(),  
+            'status': req.status,
+        })
+
+    return Response(data, status=status.HTTP_200_OK)
 @api_view(['PATCH'])
 @authentication_classes([CustomTokenAuthentication])
 def update_data_request_status(request, request_id):
     try:
-        data_request = DataRequest.objects.get(id=request_id, client=request.user)
+        data_request = DataRequest.objects.get(id=request_id, client=request.user.id)
     except DataRequest.DoesNotExist:
         return Response({'error': 'Data request not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -274,39 +309,59 @@ def update_data_request_status(request, request_id):
 
     data_request.status = status_value
     data_request.save()
-    serializer = DataRequestSerializer(data_request)
+    serializer = DataRequestSerializer(data_request, partial=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
-# Claims
-@api_view(['GET'])
-@authentication_classes([CustomTokenAuthentication])
-def get_claims(request):
-    claims = Claim.objects.filter(client=request.user)
-    serializer = ClaimSerializer(claims, many=True)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
 
 @api_view(['POST'])
 @authentication_classes([CustomTokenAuthentication])
 def submit_claim(request):
     data = request.data.copy()
-    data['client'] = request.user.id  # Automatically set the client to the authenticated user
-    data['status'] = 'pending'  # Set the initial status to 'pending'
+    data['client'] = request.user.id
+    data['status'] = 'pending'
     
+    # Handle files separately
+    documents = request.FILES.getlist('documents')
+
+    # Initialize the serializer with the data
     serializer = ClaimSerializer(data=data)
+    
     if serializer.is_valid():
-        serializer.save(client=request.user)
+        claim = serializer.save()
+        
+        # Save each document if there are any
+        for document in documents:
+            ClaimDocument.objects.create(
+                claim=claim,
+                document=document
+            )
+        
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# Insurance Plans
 @api_view(['GET'])
 @authentication_classes([CustomTokenAuthentication])
 def get_insurance_plans(request):
-    if request.user.insurance_company:
-        plans = InsurancePlan.objects.filter(insurancecompany=request.user.insurance_company)
-        serializer = InsurancePlanSerializer(plans, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    return Response({'error': 'Client is not registered with any insurance company'}, status=status.HTTP_400_BAD_REQUEST)
+    if request.user.insurance_companies.exists():
+        plans = InsurancePlan.objects.filter(company__in=request.user.insurance_companies.all())
+        
+        plans_with_subscription = [
+            {
+                'id': plan.id,
+                'plan_name': plan.plan_name,
+                'description': plan.description,
+                'price': plan.price,
+                'subscribed': Subscription.objects.filter(client=request.user, plan=plan).exists()
+            }
+            for plan in plans
+        ]
+        
+        return Response(plans_with_subscription, status=status.HTTP_200_OK)
+    
+    return Response({'error': 'No insurance companies found for this user'}, status=status.HTTP_404_NOT_FOUND)
 
 @api_view(['GET'])
 @authentication_classes([CustomTokenAuthentication])
@@ -376,3 +431,15 @@ def password_reset_confirm(request, uidb64, token):
     
     return JsonResponse({'error': 'Invalid or expired token'}, status=400)
 
+@api_view(['GET'])
+def insurance_company_list(request):
+    search_query = request.GET.get('search', '')
+    if search_query:
+        # Perform a case-insensitive search using LIKE
+        companies = InsuranceCompany.objects.filter(company_name__icontains=search_query)[:10]
+    else:
+        # Return the first 10 companies if no search query is provided
+        companies = InsuranceCompany.objects.all().order_by('company_name')[:10]
+
+    serializer = InsuranceCompanySerializer(companies, many=True)
+    return Response(serializer.data)

@@ -26,7 +26,6 @@ urlpatterns = [
     path('data-requests/<int:request_id>/status/', views.update_data_request_status, name='update_data_request_status'),
 
     # Claims
-    path('claims/', views.get_claims, name='get_claims'),
     path('claims/submit/', views.submit_claim, name='submit_claim'),
 
     # Insurance Plans
@@ -42,4 +41,5 @@ urlpatterns = [
     path('credit-card/add/', views.add_credit_card, name='add_credit_card'),
     path('credit-card/update/<int:card_id>/', views.update_credit_card, name='update_credit_card'),
     path('credit-card/delete/<int:card_id>/', views.delete_credit_card, name='delete_credit_card'),
+    path('insurance-companies/', views.insurance_company_list, name='insurance-companies-list'),
 ]
